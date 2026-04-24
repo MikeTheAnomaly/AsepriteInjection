@@ -32,6 +32,7 @@ namespace GhostInTheHall.AsepriteInjection
             TilemapIslandSeparationPostProcessor.Run(args, generatedTilemaps);
             TilemapIslandAnchorOffsetPostProcessor.Run(args);
             TilemapSortingLayerPostProcessor.Run(args);
+            PhysicsPostProcessor.Run(args, generatedTilemaps);
         }
     }
 }

@@ -5,6 +5,7 @@ namespace GhostInTheHall.AsepriteInjection
     [Serializable]
     public class AsepriteInjectionSettings
     {
+        public PhysicsImportTarget physicsImportTarget = PhysicsImportTarget.Unity2D;
         public bool enableTilemapPivotAdjustment = true;
         public bool enableTilemapIslandSeparation = false;
         public bool enableTilemapSortingLayerOverride = false;

@@ -38,6 +38,12 @@ namespace GhostInTheHall.AsepriteInjection
                     "When enabled, automatically sets sprite pivots to bottom center for tilemap usage"),
                 settings.enableTilemapPivotAdjustment);
 
+            settings.physicsImportTarget = (PhysicsImportTarget)EditorGUILayout.EnumPopup(
+                new GUIContent(
+                    "Physics Target",
+                    "Select which physics representation should be generated for imported tilemaps."),
+                settings.physicsImportTarget);
+
             settings.enableTilemapIslandSeparation = EditorGUILayout.Toggle(
                 new GUIContent(
                     "Enable Tilemap Island Separation",
