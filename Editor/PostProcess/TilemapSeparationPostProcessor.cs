@@ -10,6 +10,10 @@ namespace GhostInTheHall.AsepriteInjection
 {
     internal static class TilemapSeparationPostProcessor
     {
+        private static readonly Dictionary<string, Type> ResolvedTypeCache = new Dictionary<string, Type>(StringComparer.Ordinal);
+        private static readonly HashSet<string> MissingTypeCache = new HashSet<string>(StringComparer.Ordinal);
+        private static readonly object TypeCacheLock = new object();
+
         public static List<Tilemap> Run(AsepriteImporter.ImportEventArgs args)
         {
             var importedObjects = new List<UnityEngine.Object>();
@@ -241,6 +245,19 @@ namespace GhostInTheHall.AsepriteInjection
 
         private static Type FindTypeByName(string typeName)
         {
+            lock (TypeCacheLock)
+            {
+                if (ResolvedTypeCache.TryGetValue(typeName, out var cachedType))
+                {
+                    return cachedType;
+                }
+
+                if (MissingTypeCache.Contains(typeName))
+                {
+                    return null;
+                }
+            }
+
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 Type foundType;
@@ -256,8 +273,18 @@ namespace GhostInTheHall.AsepriteInjection
 
                 if (foundType != null)
                 {
+                    lock (TypeCacheLock)
+                    {
+                        ResolvedTypeCache[typeName] = foundType;
+                    }
+
                     return foundType;
                 }
+            }
+
+            lock (TypeCacheLock)
+            {
+                MissingTypeCache.Add(typeName);
             }
 
             return null;
