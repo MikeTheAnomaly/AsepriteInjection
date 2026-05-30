@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -10,6 +11,52 @@ namespace GhostInTheHall.AsepriteInjection.Tests
     public class TilemapIslandSeparationPostProcessorTests
     {
         private const string TestAssetPath = "Assets/AsepriteInjection/Tests/Offset-Test.aseprite";
+
+        [Test]
+        public void OffsetTest_Unity2DPhysics_AddsCompositeColliderSetup()
+        {
+            var importer = AssetImporter.GetAtPath(TestAssetPath);
+            Assert.That(importer, Is.Not.Null, $"Could not find importer for {TestAssetPath}");
+
+            var originalUserData = importer.userData;
+
+            try
+            {
+                EnableUnity2DPhysics(importer);
+                AssetDatabase.ImportAsset(TestAssetPath, ImportAssetOptions.ForceUpdate);
+
+                var tilemaps = GetImportedTilemaps(TestAssetPath);
+                Assert.That(tilemaps.Count, Is.GreaterThan(0), "Expected imported tilemaps for the test asset.");
+
+                foreach (var tilemap in tilemaps)
+                {
+                    var tilemapCollider2D = tilemap.GetComponent<TilemapCollider2D>();
+                    Assert.That(tilemapCollider2D, Is.Not.Null, $"Missing TilemapCollider2D on {tilemap.name}");
+
+                    var compositeCollider2D = tilemap.GetComponent<CompositeCollider2D>();
+                    Assert.That(compositeCollider2D, Is.Not.Null, $"Missing CompositeCollider2D on {tilemap.name}");
+                    Assert.That(
+                        compositeCollider2D.geometryType,
+                        Is.EqualTo(CompositeCollider2D.GeometryType.Polygons),
+                        $"CompositeCollider2D geometry type mismatch on {tilemap.name}");
+
+                    var rigidbody2D = tilemap.GetComponent<Rigidbody2D>();
+                    Assert.That(rigidbody2D, Is.Not.Null, $"Missing Rigidbody2D on {tilemap.name}");
+                    Assert.That(rigidbody2D.bodyType, Is.EqualTo(RigidbodyType2D.Static), $"Rigidbody2D is not static on {tilemap.name}");
+
+                    Assert.That(
+                        IsConfiguredForComposite(tilemapCollider2D),
+                        Is.True,
+                        $"TilemapCollider2D is not configured for composite usage on {tilemap.name}");
+                }
+            }
+            finally
+            {
+                importer.userData = originalUserData;
+                EditorUtility.SetDirty(importer);
+                AssetDatabase.ImportAsset(TestAssetPath, ImportAssetOptions.ForceUpdate);
+            }
+        }
 
         [Test]
         public void OffsetTest_CreatesThreeIslands_WithExpectedTileCountsInOrder()
@@ -91,6 +138,26 @@ namespace GhostInTheHall.AsepriteInjection.Tests
             settings.enableTilemapIslandSeparation = true;
             importer.userData = JsonUtility.ToJson(settings);
             EditorUtility.SetDirty(importer);
+        }
+
+        private static void EnableUnity2DPhysics(AssetImporter importer)
+        {
+            var settings = JsonUtility.FromJson<AsepriteInjectionSettings>(importer.userData) ?? new AsepriteInjectionSettings();
+            settings.physicsImportTarget = PhysicsImportTarget.Unity2D;
+            settings.enableTilemapIslandSeparation = false;
+            importer.userData = JsonUtility.ToJson(settings);
+            EditorUtility.SetDirty(importer);
+        }
+
+        private static List<Tilemap> GetImportedTilemaps(string assetPath)
+        {
+            return AssetDatabase
+                .LoadAllAssetsAtPath(assetPath)
+                .OfType<GameObject>()
+                .SelectMany(go => go.GetComponentsInChildren<Tilemap>(true))
+                .Where(tilemap => tilemap != null && tilemap.gameObject.activeSelf)
+                .Distinct()
+                .ToList();
         }
 
         private static List<Tilemap> GetIslandTilemaps(string assetPath)
@@ -176,6 +243,31 @@ namespace GhostInTheHall.AsepriteInjection.Tests
             {
                 failures.Add($"{islandName} localPosition.y mismatch. Expected={expectedY}, Actual={actualY}. {DescribeTilemap(tilemap)}");
             }
+        }
+
+        private static bool IsConfiguredForComposite(TilemapCollider2D tilemapCollider2D)
+        {
+            if (tilemapCollider2D == null)
+            {
+                return false;
+            }
+
+            var colliderType = tilemapCollider2D.GetType();
+
+            var compositeOperationProperty = colliderType.GetProperty("compositeOperation");
+            if (compositeOperationProperty != null)
+            {
+                var value = compositeOperationProperty.GetValue(tilemapCollider2D);
+                return value != null && !string.Equals(value.ToString(), "None", StringComparison.OrdinalIgnoreCase);
+            }
+
+            var usedByCompositeProperty = colliderType.GetProperty("usedByComposite");
+            if (usedByCompositeProperty != null && usedByCompositeProperty.PropertyType == typeof(bool))
+            {
+                return (bool)usedByCompositeProperty.GetValue(tilemapCollider2D);
+            }
+
+            return false;
         }
     }
 }

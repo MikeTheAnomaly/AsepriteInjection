@@ -50,6 +50,18 @@ namespace GhostInTheHall.AsepriteInjection
                     UnityEngine.Object.DestroyImmediate(tilemapCollider2D);
                 }
 
+                var compositeCollider2D = tilemap.GetComponent<CompositeCollider2D>();
+                if (compositeCollider2D != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(compositeCollider2D);
+                }
+
+                var rigidbody2D = tilemap.GetComponent<Rigidbody2D>();
+                if (rigidbody2D != null && rigidbody2D.bodyType == RigidbodyType2D.Static && tilemap.GetComponents<Collider2D>().Length == 0)
+                {
+                    UnityEngine.Object.DestroyImmediate(rigidbody2D);
+                }
+
                 var islands = FindTileIslands(tilemap);
                 var islandIndex = 1;
                 foreach (var island in islands)
